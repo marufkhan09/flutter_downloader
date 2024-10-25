@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -12,7 +13,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       home: PermissionHandlerWidget(),
     );
   }
@@ -49,7 +50,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
           ListTile(
             title: const Text("Request Storage Permission"),
             onTap: () async {
-              bool result = await _requestPermission("storage");
+              bool result = await _requestStoragePermission();
               _showPermissionStatus(result, "Storage");
             },
           ),
@@ -100,6 +101,36 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
       return false;
     }
     return status.isGranted;
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    bool granted = false;
+
+    if (Platform.isAndroid) {
+      DeviceInfoPlugin plugin = DeviceInfoPlugin();
+      AndroidDeviceInfo android = await plugin.androidInfo;
+
+      if (android.version.sdkInt < 33) {
+        // For Android versions below 13
+        PermissionStatus status = await Permission.storage.request();
+        granted = status.isGranted;
+      } else {
+        // For Android 13 and above, handle media-specific permissions
+        PermissionStatus photoStatus = await Permission.photos.request();
+        PermissionStatus videoStatus = await Permission.videos.request();
+        PermissionStatus audioStatus = await Permission.audio.request();
+        granted = photoStatus.isGranted ||
+            videoStatus.isGranted ||
+            audioStatus.isGranted;
+      }
+    } else if (Platform.isIOS) {
+      PermissionStatus status = await Permission.photos.request();
+      granted = status.isGranted;
+    } else {
+      granted = true; // Other platforms automatically grant permission
+    }
+
+    return granted;
   }
 
   void _showPermissionStatus(bool granted, String permissionName) {
