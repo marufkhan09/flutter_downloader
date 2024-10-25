@@ -2,9 +2,16 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_downloader/flutter_downloader.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize FlutterDownloader before running the app
+  await FlutterDownloader.initialize(debug: true,ignoreSsl: true);
+
   runApp(const MyApp());
 }
 
@@ -28,33 +35,70 @@ class PermissionHandlerWidget extends StatefulWidget {
 }
 
 class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
+  String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
+  String? taskId;
+  int progress = 0;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: ListView(children: [
-          ListTile(
-            title: Text("Request Notification Permission"),
-            onTap: () async {
-              bool result = await _requestPermission("notification");
-              _showPermissionStatus(result, "Notification");
-            },
+      body: Column(
+        children: [
+          Container(
+            height: 300,
+            child: Center(
+              child: ListView(children: [
+                ListTile(
+                  title: Text("Request Notification Permission"),
+                  onTap: () async {
+                    bool result = await _requestPermission("notification");
+                    _showPermissionStatus(result, "Notification");
+                  },
+                ),
+                ListTile(
+                  title: Text("Request Camera Permission"),
+                  onTap: () async {
+                    bool result = await _requestPermission("camera");
+                    _showPermissionStatus(result, "Camera");
+                  },
+                ),
+                ListTile(
+                  title: const Text("Request Storage Permission"),
+                  onTap: () async {
+                    bool result = await _requestStoragePermission();
+                    _showPermissionStatus(result, "Storage");
+                  },
+                ),
+              ]),
+            ),
           ),
-          ListTile(
-            title: Text("Request Camera Permission"),
-            onTap: () async {
-              bool result = await _requestPermission("camera");
-              _showPermissionStatus(result, "Camera");
-            },
-          ),
-          ListTile(
-            title: const Text("Request Storage Permission"),
-            onTap: () async {
-              bool result = await _requestStoragePermission();
-              _showPermissionStatus(result, "Storage");
-            },
-          ),
-        ]),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    _requestStoragePermission().then((value) {
+                      if (value) {
+                        _downloadFile();
+                      }
+                    });
+                  },
+                  child: const Text("Download PDF"),
+                ),
+                const SizedBox(height: 20),
+                if (progress >
+                    0) // Show progress bar if progress is greater than 0
+                  Column(
+                    children: [
+                      Text('Download Progress: $progress%'),
+                      const SizedBox(height: 10),
+                      LinearProgressIndicator(value: progress / 100),
+                    ],
+                  ),
+              ],
+            ),
+          )
+        ],
       ),
     );
   }
@@ -149,5 +193,28 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
         backgroundColor: color,
       ),
     );
+  }
+
+  Future<void> _downloadFile() async {
+    // Get external directory for saving the file
+    final directory = await getExternalStorageDirectory();
+    final savePath = '${directory?.path}/maruf.pdf'; // Specify full file path
+
+    // Initiate download
+    taskId = await FlutterDownloader.enqueue(
+      url: downloadUrl,
+      savedDir: directory?.path ?? '',
+      fileName:
+          "maruf_${DateTime.now().millisecondsSinceEpoch}.pdf", // Use a unique filename
+      showNotification: true,
+      openFileFromNotification: true,
+    );
+
+    // Listen for download progress
+    FlutterDownloader.registerCallback((id, status, progress) {
+      setState(() {
+        this.progress = progress;
+      });
+    });
   }
 }
