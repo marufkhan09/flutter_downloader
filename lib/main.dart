@@ -1,5 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:ui';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -10,7 +12,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize FlutterDownloader before running the app
-  await FlutterDownloader.initialize(debug: true,ignoreSsl: true);
+  await FlutterDownloader.initialize(debug: true, ignoreSsl: true);
 
   runApp(const MyApp());
 }
@@ -38,6 +40,85 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
   String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
   String? taskId;
   int progress = 0;
+  late bool _permissionReady;
+  late String _localPath;
+  final ReceivePort _port = ReceivePort();
+
+  @override
+  void initState() {
+    super.initState();
+    _bindBackgroundIsolate();
+    FlutterDownloader.registerCallback(downloadCallback, step: 1);
+    _permissionReady = false;
+    _prepare();
+  }
+
+  void _bindBackgroundIsolate() {
+    final isSuccess = IsolateNameServer.registerPortWithName(
+      _port.sendPort,
+      'downloader_send_port',
+    );
+    if (!isSuccess) {
+      _unbindBackgroundIsolate();
+      _bindBackgroundIsolate();
+      return;
+    }
+    _port.listen((dynamic data) {
+      final taskId = (data as List<dynamic>)[0] as String;
+      final status = DownloadTaskStatus.fromInt(data[1] as int);
+      final progress = data[2] as int;
+
+      print(
+        'Callback on UI isolate: '
+        'task ($taskId) is in status ($status) and progress ($progress)',
+      );
+    });
+  }
+
+  void _unbindBackgroundIsolate() {
+    IsolateNameServer.removePortNameMapping('downloader_send_port');
+  }
+
+  @pragma('vm:entry-point')
+  static void downloadCallback(String id, int status, int progress) {
+    print(
+      'Callback on background isolate: '
+      'task ($id) is in status ($status) and progress ($progress)',
+    );
+
+    IsolateNameServer.lookupPortByName('downloader_send_port')
+        ?.send([id, status, progress]);
+  }
+
+  Future<void> _prepare() async {
+    _permissionReady = await _requestStoragePermission();
+    if (_permissionReady) {
+      await _prepareSaveDir();
+    }
+  }
+
+  Future<void> _prepareSaveDir() async {
+    _localPath = (await _getSavedDir())!;
+    final savedDir = Directory(_localPath);
+    if (!savedDir.existsSync()) {
+      await savedDir.create();
+    }
+  }
+
+  Future<String?> _getSavedDir() async {
+    String? externalStorageDirPath;
+    externalStorageDirPath =
+        (await getApplicationDocumentsDirectory()).absolute.path;
+
+    return externalStorageDirPath;
+  }
+
+  @override
+  void dispose() {
+    _unbindBackgroundIsolate();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,7 +160,8 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
                   onPressed: () {
                     _requestStoragePermission().then((value) {
                       if (value) {
-                        _downloadFile();
+                        _downloadFile(
+                            'https://pdfobject.com/pdf/sample.pdf'); // Static PDF URL
                       }
                     });
                   },
@@ -195,26 +277,53 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     );
   }
 
-  Future<void> _downloadFile() async {
-    // Get external directory for saving the file
-    final directory = await getExternalStorageDirectory();
-    final savePath = '${directory?.path}/maruf.pdf'; // Specify full file path
+  Future<void> _downloadFile(String url) async {
+    // Ensure the local path is valid
+    log('Saving to: $_localPath');
 
-    // Initiate download
-    taskId = await FlutterDownloader.enqueue(
-      url: downloadUrl,
-      savedDir: directory?.path ?? '',
-      fileName:
-          "maruf_${DateTime.now().millisecondsSinceEpoch}.pdf", // Use a unique filename
+    final taskId = await FlutterDownloader.enqueue(
+      url: url,
+      savedDir: _localPath,
       showNotification: true,
       openFileFromNotification: true,
+      saveInPublicStorage: true, // Save in public storage
     );
 
-    // Listen for download progress
-    FlutterDownloader.registerCallback((id, status, progress) {
-      setState(() {
-        this.progress = progress;
-      });
-    });
+    log('Download started with taskId: $taskId');
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+  // Future<bool> _checkPermission() async {
+  //   if (Platform.isIOS) {
+  //     return true;
+  //   }
+
+  //   if (Platform.isAndroid) {
+  //     final info = await DeviceInfoPlugin().androidInfo;
+  //     if (info.version.sdkInt > 28) {
+  //       return true;
+  //     }
+
+  //     final status = await Permission.storage.status;
+  //     if (status == PermissionStatus.granted) {
+  //       return true;
+  //     }
+
+  //     final result = await Permission.storage.request();
+  //     return result == PermissionStatus.granted;
+  //   }
+
+  //   throw StateError('unknown platform');
+  // }
+
+
