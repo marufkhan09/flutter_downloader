@@ -43,7 +43,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
   late bool _permissionReady;
   late String _localPath;
   final ReceivePort _port = ReceivePort();
-
+  bool _isDownloading = false;
   @override
   void initState() {
     super.initState();
@@ -160,8 +160,8 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
                   onPressed: () {
                     _requestStoragePermission().then((value) {
                       if (value) {
-                        _downloadFile(
-                            'https://pdfobject.com/pdf/sample.pdf'); // Static PDF URL
+                        _showDownloadDialog(); // Show the download dialog
+                        _downloadFile(downloadUrl); // Start the download
                       }
                     });
                   },
@@ -278,8 +278,11 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
   }
 
   Future<void> _downloadFile(String url) async {
-    // Ensure the local path is valid
     log('Saving to: $_localPath');
+
+    setState(() {
+      _isDownloading = true; // Update the state to indicate downloading
+    });
 
     final taskId = await FlutterDownloader.enqueue(
       url: url,
@@ -290,40 +293,81 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     );
 
     log('Download started with taskId: $taskId');
+
+    // Wait for the download to complete
+    FlutterDownloader.registerCallback((id, status, progress) {
+      log('Download status: $status, progress: $progress');
+      if (status == DownloadTaskStatus.complete) {
+        // Close the dialog and show completed message
+        setState(() {
+          _isDownloading = false; // Update the state
+        });
+        // Navigator.of(context).pop(); // Close the dialog
+        // _showCompletionDialog(); // Show completion dialog
+      } else {
+        setState(() {
+          this.progress = progress; // Update progress
+        });
+      }
+    });
   }
+
+void _showDownloadDialog() {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (BuildContext context, void Function(void Function()) setState) {
+          // Update progress dynamically
+          _port.listen((dynamic data) {
+            final String taskId = (data as List<dynamic>)[0] as String;
+            final DownloadTaskStatus status = DownloadTaskStatus.fromInt(data[1] as int);
+            final int currentProgress = data[2] as int;
+
+            // Update state to reflect progress
+            setState(() {
+              progress = currentProgress;
+            });
+
+            // Close dialog when download is complete
+            if (status == DownloadTaskStatus.complete) {
+             setState(() {
+              
+            });// Show completion message
+            }
+          });
+
+          return AlertDialog(
+            title: Text("Downloading..."),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LinearProgressIndicator(value: progress / 100),
+                const SizedBox(height: 20),
+             progress == 100
+                    ? const Text("Downloaded")
+                    : Text("Downloading... $progress%"),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  // Optionally, you could cancel the download here
+                  Navigator.of(context).pop(); // Close the dialog
+                },
+                child: const Text("Cancel"),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
 }
 
 
 
-
-
-
-
-
-
-
-
-  // Future<bool> _checkPermission() async {
-  //   if (Platform.isIOS) {
-  //     return true;
-  //   }
-
-  //   if (Platform.isAndroid) {
-  //     final info = await DeviceInfoPlugin().androidInfo;
-  //     if (info.version.sdkInt > 28) {
-  //       return true;
-  //     }
-
-  //     final status = await Permission.storage.status;
-  //     if (status == PermissionStatus.granted) {
-  //       return true;
-  //     }
-
-  //     final result = await Permission.storage.request();
-  //     return result == PermissionStatus.granted;
-  //   }
-
-  //   throw StateError('unknown platform');
-  // }
 
 
