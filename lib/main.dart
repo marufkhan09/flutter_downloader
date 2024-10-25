@@ -37,13 +37,15 @@ class PermissionHandlerWidget extends StatefulWidget {
 }
 
 class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
-  String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
-  String? taskId;
+  //String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
+  String downloadUrl =
+      "http://englishonlineclub.com/pdf/iOS%20Programming%20-%20The%20Big%20Nerd%20Ranch%20Guide%20(6th%20Edition)%20[EnglishOnlineClub.com].pdf";
   int progress = 0;
   late bool _permissionReady;
   late String _localPath;
   final ReceivePort _port = ReceivePort();
   bool _isDownloading = false;
+
   @override
   void initState() {
     super.initState();
@@ -68,10 +70,19 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
       final status = DownloadTaskStatus.fromInt(data[1] as int);
       final progress = data[2] as int;
 
-      print(
-        'Callback on UI isolate: '
-        'task ($taskId) is in status ($status) and progress ($progress)',
-      );
+      // Update the UI when download progress changes
+      setState(() {
+        this.progress = progress;
+        _isDownloading = status == DownloadTaskStatus.running;
+      });
+
+      // Close the dialog when download completes
+      if (status == DownloadTaskStatus.complete) {
+        Navigator.of(context).pop(); // Close the dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Download Completed!")),
+        );
+      }
     });
   }
 
@@ -81,11 +92,6 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
 
   @pragma('vm:entry-point')
   static void downloadCallback(String id, int status, int progress) {
-    print(
-      'Callback on background isolate: '
-      'task ($id) is in status ($status) and progress ($progress)',
-    );
-
     IsolateNameServer.lookupPortByName('downloader_send_port')
         ?.send([id, status, progress]);
   }
@@ -109,7 +115,6 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     String? externalStorageDirPath;
     externalStorageDirPath =
         (await getApplicationDocumentsDirectory()).absolute.path;
-
     return externalStorageDirPath;
   }
 
@@ -293,81 +298,41 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     );
 
     log('Download started with taskId: $taskId');
-
-    // Wait for the download to complete
-    FlutterDownloader.registerCallback((id, status, progress) {
-      log('Download status: $status, progress: $progress');
-      if (status == DownloadTaskStatus.complete) {
-        // Close the dialog and show completed message
-        setState(() {
-          _isDownloading = false; // Update the state
-        });
-        // Navigator.of(context).pop(); // Close the dialog
-        // _showCompletionDialog(); // Show completion dialog
-      } else {
-        setState(() {
-          this.progress = progress; // Update progress
-        });
-      }
-    });
   }
 
-void _showDownloadDialog() {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (BuildContext context, void Function(void Function()) setState) {
-          // Update progress dynamically
-          _port.listen((dynamic data) {
-            final String taskId = (data as List<dynamic>)[0] as String;
-            final DownloadTaskStatus status = DownloadTaskStatus.fromInt(data[1] as int);
-            final int currentProgress = data[2] as int;
-
-            // Update state to reflect progress
-            setState(() {
-              progress = currentProgress;
-            });
-
-            // Close dialog when download is complete
-            if (status == DownloadTaskStatus.complete) {
-             setState(() {
-              
-            });// Show completion message
-            }
-          });
-
-          return AlertDialog(
-            title: Text("Downloading..."),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(value: progress / 100),
-                const SizedBox(height: 20),
-             progress == 100
-                    ? const Text("Downloaded")
-                    : Text("Downloading... $progress%"),
-              ],
+  void _showDownloadDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Downloading..."),
+          content: StatefulBuilder(
+            builder: (BuildContext context,
+                void Function(void Function()) setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: progress / 100),
+                  const SizedBox(height: 20),
+                  Text(progress == 100
+                      ? "Downloaded"
+                      : "Downloading... $progress%"),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Optionally, you could cancel the download here
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: const Text("Cancel"),
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  // Optionally, you could cancel the download here
-                  Navigator.of(context).pop(); // Close the dialog
-                },
-                child: const Text("Cancel"),
-              ),
-            ],
-          );
-        },
-      );
-    },
-  );
+          ],
+        );
+      },
+    );
+  }
 }
-}
-
-
-
-
-
