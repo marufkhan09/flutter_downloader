@@ -1,27 +1,21 @@
+import 'package:flutter/material.dart';
 
+class CustomProgressDialog extends StatelessWidget {
+  const CustomProgressDialog({super.key});
 
-// import 'dart:io';
-
-// import 'package:flutter/material.dart';
-// import 'package:flutter_downloader/flutter_downloader.dart';
-// import 'package:path_provider/path_provider.dart';
-// import 'package:permission_handler/permission_handler.dart';
-
-// class DownloadPage extends StatefulWidget {
-//   @override
-//   _DownloadPageState createState() => _DownloadPageState();
-// }
-
-// // Sample PDF URL
-// class _DownloadPageState extends State<DownloadPage> {
-
-
-//   @override
-//   void initState() {
-//     super.initState();
-//   }
-
-
-  
-
-// }
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      iconPadding: EdgeInsets.zero,
+      insetPadding: EdgeInsets.zero,
+      titlePadding: EdgeInsets.zero,
+      buttonPadding: EdgeInsets.zero,
+      actionsPadding: EdgeInsets.zero,
+      contentPadding: EdgeInsets.zero,
+      content: SingleChildScrollView(
+        child: Center(
+            child: Text('Downloading', style: const TextStyle(fontSize: 20))),
+      ),
+    );
+  }
+}

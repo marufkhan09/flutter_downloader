@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:downloader/download.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
 import 'package:path_provider/path_provider.dart';
@@ -45,7 +46,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
   late String _localPath;
   final ReceivePort _port = ReceivePort();
   bool _isDownloading = false;
-
+  bool _isDialogOpen = false;
   @override
   void initState() {
     super.initState();
@@ -65,23 +66,39 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
       _bindBackgroundIsolate();
       return;
     }
+
     _port.listen((dynamic data) {
       final taskId = (data as List<dynamic>)[0] as String;
       final status = DownloadTaskStatus.fromInt(data[1] as int);
       final progress = data[2] as int;
 
-      // Update the UI when download progress changes
       setState(() {
         this.progress = progress;
         _isDownloading = status == DownloadTaskStatus.running;
       });
 
-      // Close the dialog when download completes
-      if (status == DownloadTaskStatus.complete) {
-        Navigator.of(context).pop(); // Close the dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Download Completed!")),
+      if (status == DownloadTaskStatus.running && !_isDialogOpen) {
+        _isDialogOpen = true; // Track that dialog is open
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return CustomProgressDialog();
+          },
         );
+      } else if (status == DownloadTaskStatus.running && _isDialogOpen) {
+        // Update dialog progress when it’s open and running
+        (context as Element).markNeedsBuild();
+      }
+
+      if (status == DownloadTaskStatus.complete || !_isDownloading) {
+        if (_isDialogOpen) {
+          Navigator.of(context).pop(); // Close the dialog
+          _isDialogOpen = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Download Completed!")),
+          );
+        }
       }
     });
   }
@@ -165,7 +182,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
                   onPressed: () {
                     _requestStoragePermission().then((value) {
                       if (value) {
-                        _showDownloadDialog(); // Show the download dialog
+                        //  _showDownloadDialog(); // Show the download dialog
                         _downloadFile(downloadUrl); // Start the download
                       }
                     });
@@ -298,41 +315,5 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     );
 
     log('Download started with taskId: $taskId');
-  }
-
-  void _showDownloadDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Downloading..."),
-          content: StatefulBuilder(
-            builder: (BuildContext context,
-                void Function(void Function()) setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LinearProgressIndicator(value: progress / 100),
-                  const SizedBox(height: 20),
-                  Text(progress == 100
-                      ? "Downloaded"
-                      : "Downloading... $progress%"),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // Optionally, you could cancel the download here
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: const Text("Cancel"),
-            ),
-          ],
-        );
-      },
-    );
   }
 }
