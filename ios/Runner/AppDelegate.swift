@@ -31,6 +31,7 @@ import UserNotifications // Import UserNotifications
   }
 }
 
+// Ensure the registerPlugins function is outside the AppDelegate class
 private func registerPlugins(registry: FlutterPluginRegistry) {
     if (!registry.hasPlugin("FlutterDownloaderPlugin")) {
        FlutterDownloaderPlugin.register(with: registry.registrar(forPlugin: "FlutterDownloaderPlugin")!)

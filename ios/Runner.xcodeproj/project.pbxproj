@@ -16,7 +16,7 @@
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
-		CA07C4AD2CCC56D8007AE636 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CA07C4AC2CCC56CF007AE636 /* libsqlite3.tbd */; };
+		CACB63C12CCCFD7500B940C4 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = CA07C4AC2CCC56CF007AE636 /* libsqlite3.tbd */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -82,7 +82,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CA07C4AD2CCC56D8007AE636 /* libsqlite3.tbd in Frameworks */,
+				CACB63C12CCCFD7500B940C4 /* libsqlite3.tbd in Frameworks */,
 				1A794105384E4B8A5B505891 /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
