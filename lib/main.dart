@@ -38,12 +38,12 @@ class PermissionHandlerWidget extends StatefulWidget {
 }
 
 class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
-  //String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
+  // String downloadUrl = "https://pdfobject.com/pdf/sample.pdf";
   String downloadUrl =
       "http://englishonlineclub.com/pdf/iOS%20Programming%20-%20The%20Big%20Nerd%20Ranch%20Guide%20(6th%20Edition)%20[EnglishOnlineClub.com].pdf";
   int progress = 0;
   late bool _permissionReady;
-  late String _localPath;
+  String? _localPath;
   final ReceivePort _port = ReceivePort();
   bool _isDownloading = false;
   bool _isDialogOpen = false;
@@ -83,7 +83,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
           context: context,
           barrierDismissible: false,
           builder: (BuildContext context) {
-            return CustomProgressDialog();
+            return const CustomProgressDialog();
           },
         );
       } else if (status == DownloadTaskStatus.running && _isDialogOpen) {
@@ -121,18 +121,22 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
   }
 
   Future<void> _prepareSaveDir() async {
-    _localPath = (await _getSavedDir())!;
-    final savedDir = Directory(_localPath);
-    if (!savedDir.existsSync()) {
-      await savedDir.create();
+    _localPath = await _getSavedDir();
+    if (_localPath != null) {
+      final savedDir = Directory(_localPath!);
+      if (!savedDir.existsSync()) {
+        await savedDir.create();
+      }
     }
   }
 
   Future<String?> _getSavedDir() async {
-    String? externalStorageDirPath;
-    externalStorageDirPath =
-        (await getApplicationDocumentsDirectory()).absolute.path;
-    return externalStorageDirPath;
+    if (Platform.isAndroid) {
+      return (await getExternalStorageDirectory())?.path;
+    } else if (Platform.isIOS) {
+      return (await getApplicationDocumentsDirectory()).path;
+    }
+    return null;
   }
 
   @override
@@ -152,8 +156,12 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
               child: ListView(children: [
                 ListTile(
                   title: Text("Request Notification Permission"),
+                  // onTap: () async {
+                  //   bool result = await _requestPermission("notification");
+                  //   _showPermissionStatus(result, "Notification");
+                  // },
                   onTap: () async {
-                    bool result = await _requestPermission("notification");
+                    bool result = await requestNotificationPermission();
                     _showPermissionStatus(result, "Notification");
                   },
                 ),
@@ -213,6 +221,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
     switch (permissionType.toLowerCase()) {
       case "notification":
         permission = Permission.notification;
+        log(permission.toString());
         break;
       case "camera":
         permission = Permission.camera;
@@ -244,6 +253,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
 
     // Request the specific permission
     final status = await permission.request();
+    log(status.toString());
     if (status.isDenied) {
       openAppSettings(); // Open settings if denied
       return false;
@@ -271,14 +281,31 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
             videoStatus.isGranted ||
             audioStatus.isGranted;
       }
-    } else if (Platform.isIOS) {
-      PermissionStatus status = await Permission.photos.request();
-      granted = status.isGranted;
     } else {
       granted = true; // Other platforms automatically grant permission
     }
 
     return granted;
+  }
+
+  Future<bool> requestNotificationPermission() async {
+    // Check notification permission status
+    var status = await Permission.notification.status;
+    log(status.toString());
+    // Request permission if not granted
+    if (!status.isGranted) {
+      status = await Permission.notification.request();
+      log("here");
+    }
+
+    // Return true if permission is granted, otherwise false
+    if (status.isGranted) {
+      print("Notification permission granted");
+      return true;
+    } else {
+      print("Notification permission denied");
+      return false;
+    }
   }
 
   void _showPermissionStatus(bool granted, String permissionName) {
@@ -308,7 +335,7 @@ class _PermissionHandlerWidgetState extends State<PermissionHandlerWidget> {
 
     final taskId = await FlutterDownloader.enqueue(
       url: url,
-      savedDir: _localPath,
+      savedDir: _localPath!,
       showNotification: true,
       openFileFromNotification: true,
       saveInPublicStorage: true, // Save in public storage
